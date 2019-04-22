@@ -3,6 +3,8 @@ const morgan = require('morgan');
 const helmet = require('helmet');
 const bodyParser = require('body-parser');
 const cookieParser = require('cookie-parser');
+const secretKey = 'abcde$123';
+const uuidv1 = require('uuid/v1');
 
 const info = { port: 3000, name: 'express router sample.' };
 
@@ -14,7 +16,7 @@ app.use(morgan('dev'));
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({extended: true}));
 
-app.use(cookieParser());
+app.use(cookieParser(secretKey));
 
 const publicRoute = express.Router();
 publicRoute.get('/', (req, res) => {
@@ -26,14 +28,35 @@ publicRoute.get('/contact', (req, res) => {
 publicRoute.get('/about', (req, res) => {
     res.send('Public about route.')
 });
-publicRoute.all('/login/:id', (req, res) => {
+publicRoute.all(['/login', '/login/:id'], (req, res) => {
     // req.params: data received from route paramsters like http://.../users/:userId/books/:bookId
     //   req.body: data send inside body content (like application/json)
     //  req.query: query string from url.
     let id = req.body['id'] || req.query['id'] || req.params['id'];
     console.log(`id: ${id}`);
 
-    res.send('Public login route.');
+    let uid = null;
+    console.log(req.signedCookies['user']);
+    if (req.signedCookies.user) {
+        uid = req.signedCookies.user.uid;
+    }
+
+    if (!uid) {
+        let user = {
+            uid: uuidv1()
+        }
+        uid = user.uid;
+        let opt = { 
+            signed: true, 
+            httpOnly: true, 
+            maxAge: 1000 * 60 * 60 * 24 * 356 * 10 // maxAge = 10 years.            
+        };
+        //res.cookie('user', JSON.stringify(user, null, 2), opt);
+        res.cookie('user', user, opt);
+    }
+
+    res.send(`Public login route. uuid:${uid}`);
+    
 });
 app.use('/', publicRoute);
 
